@@ -1,57 +1,68 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import qualified Data.Text as T
 import System.Exit
+import System.IO
+
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Graphics.Vty.Widgets.All
 import Graphics.Vty.LLInput
 import Graphics.Vty.Attributes
 
-newListView :: [T.Text] -> IO (Widget (List T.Text FormattedText))
-newListView sources = case sources of
-  (x:xs) -> do
-    lst <- newListView xs
-    addToList lst x =<< plainText x
-    return lst
-  [] -> newList (fgColor white) 1
+
+stdoutAction :: T.Text -> IO ()
+stdoutAction s = TIO.hPutStr stdout s
 
 main :: IO()
 main = do
   -- configures
   let infoAttr = (black `on` white) -- attribute for header and footer
+  let listAttr = (fgColor white)
   let titleString = "alsw: anything.el-like selector widget"
   let promptString = "> "
+  let footerString = "source: "
+  -- let sources = take 1000 $ repeat $ T.pack "homhom"
+  let sources = ["homhom", "madoka", "saki"]
+  let sourceName = "sample"
 
   -- Header
-  title <- (plainText titleString) <++> (hFill ' ' 1)
-  setNormalAttribute title infoAttr
+  header <- (plainText titleString) <++> (hFill ' ' 1)
+  setNormalAttribute header infoAttr
+
+  -- Selector
+  lst <- newTextList listAttr sources 1
   prompt <- plainText promptString
   e <- editWidget
-  header <- (return title) <--> (hBox prompt e)
-
-  -- List
-  let sources = ["homhom", "madoka", "saki"]
-  -- let sources = take 1000 $ repeat "homhom"
-  lst <- newListView sources
+  selector <- (return prompt) <++> (return e) <--> (return lst)
+  selector `relayKeyEvents` e
 
   -- Footer
-  fw <- plainText ("source: " `T.append` "sample")
+  fw <- plainText (footerString `T.append` sourceName)
   footer <- (return fw) <++> (hFill ' ' 1)
   setNormalAttribute footer infoAttr
 
-  ui <- (return header)
-        <--> (return lst)
-        <--> (return footer)
-
   -- Focus Group
+  ui <- (return header) <--> (return selector) <--> (return footer)
   fg <- newFocusGroup
-  _ <- addToFocusGroup fg e
-  _ <- addToFocusGroup fg lst
+  _ <- addToFocusGroup fg selector
+
+  -- Keymap
+  selector `onKeyPressed` \ _ key mods ->
+    case (key, mods) of
+      (KASCII 'p', [MCtrl]) -> scrollUp lst >> return True
+      (KASCII 'n', [MCtrl]) -> scrollDown lst >> return True
+      (KEnter, []) -> do
+        m <- getSelected lst
+        case m of Just (_, (s, _)) -> stdoutAction s >> exitSuccess
+                  Nothing          -> exitFailure
+      _ -> return False
 
   fg `onKeyPressed` \ _ key mods ->
     case (key, mods) of
-      (KASCII 'q', [MCtrl]) -> exitSuccess
-      _ -> return False
+      (KASCII 'g', [MCtrl]) -> exitSuccess
+      (KEsc, [])            -> exitSuccess
+      _                     -> return False
 
   -- Collection
   c <- newCollection
