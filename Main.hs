@@ -1,18 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import System.Exit
-import System.IO
-
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
+import qualified Data.Text.IO as T
 
 import Graphics.Vty.Widgets.All
 import Graphics.Vty.LLInput
 import Graphics.Vty.Attributes
 
+import Text.Regex.PCRE
+import Control.Monad (forM_)
+import System.IO (stdout)
+import System.Exit (exitFailure, exitSuccess)
+
 
 stdoutAction :: T.Text -> IO ()
-stdoutAction s = TIO.hPutStr stdout s
+stdoutAction s = T.hPutStr stdout s
 
 main :: IO()
 main = do
@@ -48,6 +50,12 @@ main = do
   _ <- addToFocusGroup fg selector
 
   -- Keymap
+  e `onChange` \ s -> do
+    clearList lst
+    let fsrc = filter (\ src -> (T.unpack src) =~ (T.unpack s) :: Bool) sources
+    forM_ fsrc $ \ l ->
+      (addToList lst l =<< plainText l)
+
   selector `onKeyPressed` \ _ key mods ->
     case (key, mods) of
       (KASCII 'p', [MCtrl]) -> scrollUp lst >> return True
