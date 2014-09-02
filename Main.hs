@@ -7,7 +7,7 @@ import Graphics.Vty.Widgets.All
 import Graphics.Vty.LLInput
 import Graphics.Vty.Attributes
 
-import Text.Regex.PCRE
+import Text.Regex.Posix
 import Control.Monad (forM_)
 import System.IO (stdout)
 import System.Exit (exitFailure, exitSuccess)
@@ -20,6 +20,7 @@ main :: IO()
 main = do
   -- configures
   let infoAttr = (black `on` white) -- attribute for header and footer
+  let errAttr = (white `on` red)
   let listAttr = (fgColor white)
   let titleString = "alsw: anything.el-like selector widget"
   let promptString = "> "
@@ -40,8 +41,9 @@ main = do
   selector `relayKeyEvents` e
 
   -- Footer
+  errmsg <- plainText ""
   fw <- plainText (footerString `T.append` sourceName)
-  footer <- (return fw) <++> (hFill ' ' 1)
+  footer <- (return errmsg) <++> (return fw) <++> (hFill ' ' 1)
   setNormalAttribute footer infoAttr
 
   -- Focus Group
@@ -51,10 +53,18 @@ main = do
 
   -- Keymap
   e `onChange` \ s -> do
-    clearList lst
-    let fsrc = filter (\ src -> (T.unpack src) =~ (T.unpack s) :: Bool) sources
-    forM_ fsrc $ \ l ->
-      (addToList lst l =<< plainText l)
+    let mreg = makeRegexM (T.unpack s) :: Maybe Regex
+    case mreg of
+      Nothing -> do
+        setNormalAttribute footer errAttr
+        setText errmsg "**Invalid regular expression** "
+      Just reg -> do
+        setNormalAttribute footer infoAttr
+        setText errmsg ""
+        clearList lst
+        let fsrc = filter (\ src -> match reg (T.unpack src) :: Bool) sources
+        forM_ fsrc $ \ l ->
+          (addToList lst l =<< plainText l)
 
   selector `onKeyPressed` \ _ key mods ->
     case (key, mods) of
