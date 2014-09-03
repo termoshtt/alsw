@@ -16,35 +16,62 @@ import System.Exit (exitFailure, exitSuccess)
 stdoutAction :: T.Text -> IO ()
 stdoutAction s = T.hPutStr stdout s
 
+data Config = Config { infoAttr :: Attr
+                     , errAttr :: Attr
+                     , listAttr :: Attr
+                     , titleString :: T.Text
+                     , promptString :: T.Text
+                     , footerString :: T.Text
+                     }
+
+defaultConfig :: Config
+defaultConfig = Config { infoAttr = (black `on` white)
+                       , errAttr = (white `on` red)
+                       , listAttr = (fgColor white)
+                       , titleString = "alsw: anything.el-like selector widget"
+                       , promptString = "> "
+                       , footerString = "source: "
+                       }
+
+class Source a where
+  getSource :: a -> [T.Text]
+  getSourceName :: a -> T.Text
+
+
+data StaticSource = StaticSource { source :: [T.Text]
+                                 , name :: T.Text
+                                 }
+
+instance Source StaticSource where
+  getSource ss = source ss
+  getSourceName ss = name ss
+
+holyquintet :: StaticSource
+holyquintet = StaticSource { source = ["mami", "madoka", "homhom", "sayaka", "kyoko"]
+                           , name = "holyquintet"
+                           }
+
 main :: IO()
 main = do
-  -- configures
-  let infoAttr = (black `on` white) -- attribute for header and footer
-  let errAttr = (white `on` red)
-  let listAttr = (fgColor white)
-  let titleString = "alsw: anything.el-like selector widget"
-  let promptString = "> "
-  let footerString = "source: "
-  -- let sources = take 1000 $ repeat $ T.pack "homhom"
-  let sources = ["homhom", "madoka", "saki"]
-  let sourceName = "sample"
+  let srcs = holyquintet
+  let cfg = defaultConfig
 
   -- Header
-  header <- (plainText titleString) <++> (hFill ' ' 1)
-  setNormalAttribute header infoAttr
+  header <- (plainText $ titleString cfg) <++> (hFill ' ' 1)
+  setNormalAttribute header (infoAttr cfg)
 
   -- Selector
-  lst <- newTextList listAttr sources 1
-  prompt <- plainText promptString
+  lst <- newTextList (listAttr cfg) (getSource srcs) 1
+  prompt <- plainText $ promptString cfg
   e <- editWidget
   selector <- (return prompt) <++> (return e) <--> (return lst)
   selector `relayKeyEvents` e
 
   -- Footer
   errmsg <- plainText ""
-  fw <- plainText (footerString `T.append` sourceName)
+  fw <- plainText $ T.append (footerString cfg) (getSourceName srcs)
   footer <- (return errmsg) <++> (return fw) <++> (hFill ' ' 1)
-  setNormalAttribute footer infoAttr
+  setNormalAttribute footer (infoAttr cfg)
 
   -- Focus Group
   ui <- (return header) <--> (return selector) <--> (return footer)
@@ -56,13 +83,13 @@ main = do
     let mreg = makeRegexM (T.unpack s) :: Maybe Regex
     case mreg of
       Nothing -> do
-        setNormalAttribute footer errAttr
+        setNormalAttribute footer (errAttr cfg)
         setText errmsg "**Invalid regular expression** "
       Just reg -> do
-        setNormalAttribute footer infoAttr
+        setNormalAttribute footer (infoAttr cfg)
         setText errmsg ""
         clearList lst
-        let fsrc = filter (\ src -> match reg (T.unpack src) :: Bool) sources
+        let fsrc = filter (\ src -> match reg (T.unpack src) :: Bool) $ getSource srcs
         forM_ fsrc $ \ l ->
           (addToList lst l =<< plainText l)
 
