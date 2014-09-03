@@ -12,9 +12,10 @@ import Control.Monad (forM_)
 import System.IO (stdout)
 import System.Exit (exitFailure, exitSuccess)
 
+import Alsw.Source
 
 stdoutAction :: T.Text -> IO ()
-stdoutAction s = T.hPutStr stdout s
+stdoutAction s = T.hPutStr stdout s >> exitSuccess
 
 data Config = Config { infoAttr :: Attr
                      , errAttr :: Attr
@@ -33,28 +34,20 @@ defaultConfig = Config { infoAttr = (black `on` white)
                        , footerString = "source: "
                        }
 
-class Source a where
-  getSource :: a -> [T.Text]
-  getSourceName :: a -> T.Text
+type ListWidget = Widget (List T.Text FormattedText)
 
-
-data StaticSource = StaticSource { source :: [T.Text]
-                                 , name :: T.Text
-                                 }
-
-instance Source StaticSource where
-  getSource ss = source ss
-  getSourceName ss = name ss
-
-holyquintet :: StaticSource
-holyquintet = StaticSource { source = ["mami", "madoka", "homhom", "sayaka", "kyoko"]
-                           , name = "holyquintet"
-                           }
+callAction :: ListWidget -> (T.Text -> IO ()) -> IO ()
+callAction lst act = do
+  m <- getSelected lst
+  case m of
+    Just (_, (s, _)) -> act s
+    Nothing          -> exitFailure -- TODO error handling
 
 main :: IO()
 main = do
   let srcs = holyquintet
   let cfg = defaultConfig
+  let mainAction = stdoutAction
 
   -- Header
   header <- (plainText $ titleString cfg) <++> (hFill ' ' 1)
@@ -97,10 +90,7 @@ main = do
     case (key, mods) of
       (KASCII 'p', [MCtrl]) -> scrollUp lst >> return True
       (KASCII 'n', [MCtrl]) -> scrollDown lst >> return True
-      (KEnter, []) -> do
-        m <- getSelected lst
-        case m of Just (_, (s, _)) -> stdoutAction s >> exitSuccess
-                  Nothing          -> exitFailure
+      (KEnter, []) -> callAction lst mainAction >> return True
       _ -> return False
 
   fg `onKeyPressed` \ _ key mods ->
