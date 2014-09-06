@@ -1,21 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-
 import Graphics.Vty.Widgets.All
 import Graphics.Vty.LLInput
 import Graphics.Vty.Attributes
 
+import qualified Data.Text as T
 import Text.Regex.Posix
 import Control.Monad (forM_)
-import System.IO (stdout)
 import System.Exit (exitFailure, exitSuccess)
 
 import Alsw.Source
-
-stdoutAction :: T.Text -> IO ()
-stdoutAction s = T.hPutStr stdout s >> exitSuccess
 
 data Config = Config { infoAttr :: Attr
                      , errAttr :: Attr
@@ -58,7 +52,7 @@ main :: IO()
 main = do
   let srcs = holyquintet
   let cfg = defaultConfig
-  let mainAction = stdoutAction
+  let mainAction = head $ getActions srcs
 
   -- Header
   header <- (plainText $ titleString cfg) <++> (hFill ' ' 1)
