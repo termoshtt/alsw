@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Alsw.Action
   ( Action
   , output
