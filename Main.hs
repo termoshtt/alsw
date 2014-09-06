@@ -43,6 +43,17 @@ callAction lst act = do
     Just (_, (s, _)) -> act s
     Nothing          -> exitFailure -- TODO error handling
 
+renderList :: ListWidget -> [T.Text] -> IO ()
+renderList lst src = do
+  clearList lst
+  forM_ src $ \ l ->
+    (addToList lst l =<< plainText l)
+
+renderFilteredList :: (Source a) => ListWidget -> Regex -> a -> IO ()
+renderFilteredList lst reg srcs = do
+  let fsrc = filter (\ src -> match reg (T.unpack src) :: Bool) $ getSource srcs
+  renderList lst fsrc
+
 main :: IO()
 main = do
   let srcs = holyquintet
@@ -81,10 +92,7 @@ main = do
       Just reg -> do
         setNormalAttribute footer (infoAttr cfg)
         setText errmsg ""
-        clearList lst
-        let fsrc = filter (\ src -> match reg (T.unpack src) :: Bool) $ getSource srcs
-        forM_ fsrc $ \ l ->
-          (addToList lst l =<< plainText l)
+        renderFilteredList lst reg srcs
 
   selector `onKeyPressed` \ _ key mods ->
     case (key, mods) of
